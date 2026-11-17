@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SQL Detective: The Dean Street Heist</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Special+Elite&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ink:#12141a; --ink2:#1a1d25; --ink3:#232733; --line:#2e3342;
+  --paper:#efe6d0; --paper2:#e5d9bc; --paperline:#cdbd97; --brown:#3b2f22; --muted-brown:#6d5c45;
+  --text:#e6e8ee; --muted:#9097a8; --amber:#f2b134; --red:#d6463a; --green:#4fb56b; --blue:#6aa7ff;
+  --kw:#ff8f6b; --str:#b8e07a; --num:#f2b134; --fn:#7fc8ff; --cm:#6b7385;
+  --mono:'IBM Plex Mono',ui-monospace,Menlo,Consolas,monospace;
+  --sans:'IBM Plex Sans',system-ui,sans-serif; --type:'Special Elite','Courier New',monospace;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--ink);color:var(--text);font-family:var(--sans);font-size:15px;line-height:1.5}
+button{font-family:inherit;cursor:pointer}
+code,.mono{font-family:var(--mono)}
+.app{display:grid;grid-template-rows:auto 1fr;height:100vh}
+/* header */
+header{display:flex;align-items:center;gap:18px;padding:10px 18px;border-bottom:1px solid var(--line);background:var(--ink2);flex-wrap:wrap}
+.brand{display:flex;align-items:baseline;gap:10px}
+.brand h1{font-family:var(--type);font-weight:400;font-size:22px;margin:0;letter-spacing:.5px;color:var(--amber)}
+.brand span{font-family:var(--type);color:var(--muted);font-size:14px}
+.pips{display:flex;gap:6px;margin-left:auto;align-items:center}
+.pip{width:30px;height:30px;border-radius:6px;border:1px solid var(--line);background:var(--ink3);color:var(--muted);font:600 13px var(--mono);display:grid;place-items:center;position:relative}
+.pip.done{background:#1f3a29;border-color:#2f6b43;color:#9be3b0}
+.pip.current{outline:2px solid var(--amber);outline-offset:1px;color:var(--text)}
+.pip.locked{opacity:.4;cursor:not-allowed}
+.pip.bonus{width:auto;padding:0 10px}
+.score{font:500 13px var(--mono);color:var(--muted);white-space:nowrap}
+.score b{color:var(--amber);font-weight:600}
+.hdr-btn{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:6px;padding:6px 10px;font-size:13px}
+.hdr-btn:hover{color:var(--text);border-color:var(--muted)}
+/* layout */
+main{display:grid;grid-template-columns:minmax(330px,420px) 1fr 270px;min-height:0}
+main.noschema{grid-template-columns:minmax(330px,420px) 1fr 0}
+main.noschema .schema{display:none}
+/* case file */
+.casefile{background:var(--paper);color:var(--brown);overflow:auto;position:relative;border-right:1px solid #000;
+  background-image:repeating-linear-gradient(transparent 0 27px,rgba(120,95,50,.10) 27px 28px)}
+.casefile-inner{padding:22px 24px 40px}
+.tab{display:inline-block;font-family:var(--type);background:var(--brown);color:var(--paper);padding:4px 12px;border-radius:3px;font-size:13px;letter-spacing:1px}
+.casefile h2{font-family:var(--type);font-weight:400;font-size:28px;line-height:1.15;margin:12px 0 6px;color:#2a2118}
+.stamp{position:absolute;top:18px;right:18px;font-family:var(--type);color:var(--red);border:3px solid var(--red);padding:2px 10px;transform:rotate(8deg);font-size:18px;opacity:.85;letter-spacing:2px}
+.story{font-family:var(--type);font-size:15.5px;line-height:1.6;color:#33281c}
+.story p{margin:0 0 12px}
+.story em{font-style:normal;background:rgba(242,177,52,.35);padding:0 3px}
+.section-label{font:600 11px var(--sans);letter-spacing:1.6px;text-transform:uppercase;color:var(--muted-brown);margin:22px 0 8px}
+.task{background:#fff8e6;border:1px solid var(--paperline);border-left:5px solid var(--amber);padding:12px 14px;border-radius:4px;font-family:var(--sans);font-size:15px;color:#2a2118}
+.task strong{color:#000}
+.concept{background:var(--ink2);color:var(--text);border-radius:6px;padding:14px 16px;font-size:14px;margin-top:4px}
+.concept h4{margin:0 0 6px;font:600 14px var(--sans);color:var(--amber)}
+.concept p{margin:6px 0}
+.concept pre{background:var(--ink);border:1px solid var(--line);border-radius:4px;padding:8px 10px;margin:8px 0;overflow:auto;font:13px/1.5 var(--mono);white-space:pre}
+.concept code{background:var(--ink3);padding:1px 5px;border-radius:3px;font-size:13px}
+.concept pre code{background:none;padding:0}
+.answer-row{display:flex;gap:8px;margin-top:6px}
+.answer-row input{flex:1;font:16px var(--type);padding:10px 12px;border:2px solid var(--brown);border-radius:4px;background:#fffdf6;color:#000;min-width:0}
+.answer-row input:focus{outline:3px solid rgba(242,177,52,.6)}
+.btn{border:0;border-radius:5px;padding:10px 16px;font-weight:600;font-size:14px}
+.btn-dark{background:var(--brown);color:var(--paper)}
+.btn-dark:hover{background:#000}
+.btn-amber{background:var(--amber);color:#1b1408}
+.btn-amber:hover{filter:brightness(1.08)}
+.btn-ghost{background:transparent;border:1px solid var(--paperline);color:var(--muted-brown)}
+.btn-ghost:hover{color:#000;border-color:var(--muted-brown)}
+.feedback{margin-top:10px;font-size:14px;padding:10px 12px;border-radius:4px;display:none}
+.feedback.show{display:block}
+.feedback.bad{background:#f8d9d2;color:#6b1a10;border:1px solid #e6a597}
+.feedback.good{background:#d7efd9;color:#14421f;border:1px solid #93cf9f}
+.hints{display:flex;flex-direction:column;gap:8px}
+.hint{background:#f6edd8;border:1px dashed var(--paperline);padding:9px 12px;border-radius:4px;font-size:14px;color:#3a2e20}
+.hint code{background:#eadfc4;padding:1px 4px;border-radius:3px;font-size:13px}
+.hint-actions{display:flex;gap:8px;flex-wrap:wrap}
+.solved-box{background:#1f3a29;color:#d9f5e1;border-radius:6px;padding:14px 16px;margin-top:6px}
+.solved-box h4{margin:0 0 4px;font-family:var(--type);font-weight:400;font-size:18px;color:#9be3b0}
+.solved-box .btn{margin-top:10px}
+.stars{color:var(--amber);letter-spacing:2px}
+.notebook{background:#fffdf4;border:1px solid var(--paperline);border-radius:4px;padding:10px 14px;font-family:var(--type);font-size:14px;color:#2f2519}
+.notebook ol{margin:0;padding-left:20px}
+.notebook li{margin:4px 0}
+.notebook .empty{color:var(--muted-brown)}
+/* workbench */
+.bench{display:grid;grid-template-rows:auto minmax(150px,38%) auto 1fr;min-height:0;min-width:0}
+.bench-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);background:var(--ink2)}
+.bench-bar .label{font:600 11px var(--sans);letter-spacing:1.6px;text-transform:uppercase;color:var(--muted)}
+.bench-bar .spacer{flex:1}
+.kbd{font:12px var(--mono);color:var(--muted);border:1px solid var(--line);border-radius:4px;padding:1px 6px}
+.run{background:var(--green);color:#06210f;border:0;border-radius:6px;padding:8px 16px;font-weight:700;font-size:14px;display:flex;gap:8px;align-items:center}
+.run:hover{filter:brightness(1.1)}
+.small-btn{background:var(--ink3);color:var(--muted);border:1px solid var(--line);border-radius:6px;padding:7px 11px;font-size:13px}
+.small-btn:hover{color:var(--text)}
+.editor-wrap{position:relative;background:#0e1015;min-height:0;overflow:hidden}
+.editor-wrap pre,.editor-wrap textarea{margin:0;position:absolute;inset:0;padding:14px 16px 14px 56px;font:15px/1.6 var(--mono);white-space:pre-wrap;word-wrap:break-word;overflow:auto;tab-size:2;border:0}
+.editor-wrap pre{pointer-events:none;color:var(--text)}
+.editor-wrap textarea{background:transparent;color:transparent;caret-color:var(--amber);resize:none;outline:none}
+.editor-wrap textarea::selection{background:rgba(106,167,255,.35);color:transparent}
+.gutter{position:absolute;top:0;left:0;bottom:0;width:44px;border-right:1px solid var(--line);padding:14px 8px 0 0;text-align:right;font:15px/1.6 var(--mono);color:#4a5163;overflow:hidden;user-select:none;background:#0b0d11;white-space:pre}
+.tok-kw{color:var(--kw);font-weight:600}.tok-str{color:var(--str)}.tok-num{color:var(--num)}.tok-fn{color:var(--fn)}.tok-cm{color:var(--cm);font-style:italic}.tok-op{color:#c9a7ff}
+.status{display:flex;align-items:center;gap:10px;padding:8px 14px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);background:var(--ink2);font:13px var(--mono);color:var(--muted);min-height:38px}
+.status.err{color:#ffb3a8;background:#2a1513}
+.status.ok{color:#9be3b0}
+.results{overflow:auto;min-height:0;background:var(--ink)}
+.empty-results{padding:28px;color:var(--muted);font-size:14px;max-width:560px}
+.empty-results h3{font-family:var(--type);font-weight:400;color:var(--text);font-size:20px;margin:0 0 8px}
+table.res{border-collapse:collapse;font:13.5px/1.45 var(--mono);min-width:100%}
+table.res th{position:sticky;top:0;background:var(--ink3);color:var(--amber);text-align:left;padding:8px 12px;border-bottom:1px solid var(--line);font-weight:600;white-space:nowrap}
+table.res td{padding:7px 12px;border-bottom:1px solid #1e222c;vertical-align:top;max-width:520px}
+table.res tr:nth-child(even) td{background:#151820}
+table.res tr:hover td{background:#1c2130}
+table.res td.null{color:#596075;font-style:italic}
+table.res td.num{text-align:right;color:#ffd58a}
+.res-label{padding:8px 12px;font:600 12px var(--mono);color:var(--muted);background:var(--ink2);border-top:1px solid var(--line);border-bottom:1px solid var(--line);position:sticky;left:0}
+.err-help{padding:14px 18px;font-size:14px;color:#ffd5cf;max-width:640px}
+.err-help b{color:#fff}
+/* schema */
+.schema{background:var(--ink2);border-left:1px solid var(--line);overflow:auto;padding:12px 12px 30px}
+.schema h3{font:600 11px var(--sans);letter-spacing:1.6px;text-transform:uppercase;color:var(--muted);margin:4px 4px 10px}
+.tbl{border:1px solid var(--line);border-radius:6px;margin-bottom:8px;background:var(--ink)}
+.tbl-head{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;cursor:pointer;font:600 13.5px var(--mono);color:var(--text)}
+.tbl-head:hover{color:var(--amber)}
+.tbl-head small{color:var(--muted);font-weight:400}
+.cols{border-top:1px solid var(--line);padding:4px 0;display:none}
+.tbl.open .cols{display:block}
+.col{display:flex;justify-content:space-between;padding:3px 10px 3px 16px;font:12.5px var(--mono);color:#c7ccd8;cursor:pointer}
+.col:hover{background:var(--ink3);color:var(--amber)}
+.col span:last-child{color:#5e667a;font-size:11px}
+.peek{display:block;width:calc(100% - 20px);margin:6px 10px 8px;background:var(--ink3);border:1px solid var(--line);color:var(--muted);border-radius:4px;font:12px var(--mono);padding:5px}
+.peek:hover{color:var(--text)}
+.cheat{margin-top:16px;font-size:12.5px;color:var(--muted)}
+.cheat code{display:block;font:12px/1.5 var(--mono);color:#c7ccd8;background:var(--ink);border:1px solid var(--line);border-radius:4px;padding:6px 8px;margin:4px 0 10px;white-space:pre-wrap}
+/* modal */
+.modal-back{position:fixed;inset:0;background:rgba(5,6,9,.78);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
+.modal-back.show{display:flex}
+.modal{background:var(--paper);color:var(--brown);border-radius:6px;max-width:620px;width:100%;padding:30px 34px;box-shadow:0 30px 80px rgba(0,0,0,.6);position:relative;max-height:92vh;overflow:auto}
+.modal h2{font-family:var(--type);font-weight:400;font-size:32px;margin:0 0 10px;color:#2a2118}
+.modal p{font-family:var(--type);font-size:16px;line-height:1.6}
+.modal input{width:100%;font:18px var(--type);padding:10px 12px;border:2px solid var(--brown);border-radius:4px;background:#fffdf6;margin:6px 0 16px}
+.modal .row{display:flex;gap:10px;justify-content:flex-end;flex-wrap:wrap}
+.cert{border:6px double var(--brown);padding:24px;text-align:center;background:#fffaf0}
+.cert .big{font-family:var(--type);font-size:30px;color:#2a2118;margin:6px 0}
+.cert .rank{font-family:var(--type);font-size:22px;color:var(--red)}
+.loading{position:fixed;inset:0;display:grid;place-items:center;background:var(--ink);z-index:60;font-family:var(--type);color:var(--amber);font-size:22px}
+.bonus-list{display:flex;flex-direction:column;gap:12px}
+.bonus-item{background:#fffaf0;border:1px solid var(--paperline);border-radius:4px;padding:10px 12px}
+.bonus-item .q{font-size:14.5px;color:#2a2118;margin-bottom:6px}
+.bonus-item .answer-row input{font-size:14px;padding:7px 10px}
+.bonus-item .btn{padding:7px 12px}
+.bonus-item.done{border-color:#93cf9f;background:#eef8ef}
+.bonus-item .tag{font:600 10.5px var(--sans);letter-spacing:1px;text-transform:uppercase;color:var(--muted-brown)}
+@media (max-width:1100px){
+  main{grid-template-columns:minmax(300px,380px) 1fr}
+  main .schema{display:none}
+  main.showschema-narrow{grid-template-columns:minmax(300px,380px) 1fr 250px}
+  main.showschema-narrow .schema{display:block}
+}
+@media (max-width:760px){
+  .app{height:auto}
+  main,main.showschema-narrow{grid-template-columns:1fr}
+  .casefile{max-height:none}
+  .bench{grid-template-rows:auto 220px auto minmax(260px,auto)}
+  main.showschema-narrow .schema{display:block;border-left:0;border-top:1px solid var(--line)}
+  .pips{margin-left:0}
+  .stamp{top:auto;bottom:auto;position:relative;display:inline-block;margin:10px 0 0 8px;right:auto}
+}
+</style>
+</head>
+<body>
+<div class="loading" id="loading">Opening the case file…</div>
+<div class="app">
+  <header>
+    <div class="brand"><h1>SQL Detective</h1><span>Case #3: The Dean Street Heist</span></div>
+    <div class="pips" id="pips"></div>
+    <div class="score" id="score"></div>
+    <button class="hdr-btn" id="schemaToggle" title="Show or hide the database schema">Schema</button>
+    <button class="hdr-btn" id="resetBtn">Reset</button>
+  </header>
+  <main id="main">
+    <section class="casefile" id="casefile"><div class="casefile-inner" id="caseInner"></div></section>
+    <section class="bench">
+      <div class="bench-bar">
+        <span class="label">Query console</span>
+        <span class="kbd">Ctrl/⌘ + Enter</span>
+        <span class="spacer"></span>
+        <button class="small-btn" id="clearBtn">Clear</button>
+        <button class="run" id="runBtn">▶ Run query</button>
+      </div>
+      <div class="editor-wrap">
+        <div class="gutter" id="gutter">1</div>
+        <pre id="hl" aria-hidden="true"></pre>
+        <textarea id="editor" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="SQL query editor"></textarea>
+      </div>
+      <div class="status" id="status">Ready. Write a query and press Run.</div>
+      <div class="results" id="results"></div>
+    </section>
+    <aside class="schema" id="schema"></aside>
+  </main>
+</div>
+
+<div class="modal-back" id="modalBack"><div class="modal" id="modal"></div></div>
+
+<script src="sql-wasm-inline.js"></script>
+<script>
+const CFG = {"caseId": 81, "ch3": 18, "ch3strict": 16, "ch4": 8, "ch4names": ["Dafydd Jones", "Ffion Lloyd", "Sara Vaughan", "Gwen Morgan", "Mared Ellis", "Rhys Bevan", "Marek Bowen", "Owen Price"], "ch5": ["Ffion Lloyd", "Mared Ellis", "Rhys Bevan"], "ch6decoys": ["Tom Hughes", "Zara Davies", "Seren Watkins"], "yearDecoy": "Eva Vaughan", "revansDecoy": "Gareth Davies", "bonus": {"computing": 64, "door": "S2.14", "colour": "White", "avg": 78.88, "dept2": "Physics", "nocar": 102}, "rhysId": 248};
+let SEED = '';
+
+/* ---------------- Chapters ---------------- */
+const norm = s => String(s).toLowerCase().replace(/[^a-z0-9£.]/g,'');
+const CHAPTERS = [
+{
+  title:"The Call",
+  concept:"SELECT … FROM",
+  story:`<p>Sunday, 15 November, 07:12. Your phone buzzes. It's Chief Inspector Edwards.</p>
+  <p>"Detective. Something was stolen from the Dean Street building last night, and it's big. Every end-of-semester exam paper, gone. The university has handed us their whole database. Start with the <em>incidents</em> table and tell me where it happened."</p>`,
+  task:`Look through the <code>incidents</code> table. There have been lots of thefts this term. <strong>Which room was the theft on 14 November in?</strong> Make a note of that incident's <code>id</code> too. You'll need it in Chapter 2.`,
+  lesson:`<h4>SELECT and FROM</h4>
+  <p>Every query starts by saying <b>what</b> you want and <b>where</b> it comes from.</p>
+  <pre><code>SELECT * FROM table_name;</code></pre>
+  <p><code>*</code> means "all columns". You can name the columns you want instead:</p>
+  <pre><code>SELECT name, role FROM people;</code></pre>
+  <p>Choosing just the columns you need makes long results much easier to read.</p>
+  <p>Rows come back in the order they're stored. Here that's oldest first, so recent records are at the <b>bottom</b>. Scroll the results panel to see them all.</p>
+  <p>Tip: click any table in the <b>Schema</b> panel to see its columns.</p>`,
+  starter:`-- Welcome, Detective. Lines starting with -- are comments.\n-- Run this query to look at the incidents table:\n\nSELECT * FROM incidents;`,
+  hints:[`Run <code>SELECT * FROM incidents;</code>, or pick fewer columns: <code>SELECT id, incident_date, location, description FROM incidents;</code>`,
+         `Incidents are listed oldest first, so scroll to the <b>bottom</b> of the results. Look for <code>incident_date</code> <b>2026-11-14</b> with a description starting <b>THEFT</b>, then read its <code>location</code> and <code>id</code>.`],
+  solution:`SELECT id, incident_date, location, description\nFROM incidents;\n-- Scroll to the bottom: the 14 November rows are near the end.`,
+  check:a=>['s214','rooms214'].includes(norm(a).replace(/\./g,'')),
+  answerText:"S2.14",
+  clue:`Incident <b>#${CFG.caseId}</b>: theft of the exam-paper drive from room <b>S2.14</b>, Dean Street, on 14 Nov. Floor 2 CCTV was offline ~22:30–22:55.`
+},
+{
+  title:"The Witnesses",
+  concept:"WHERE",
+  story:`<p>Edwards grunts. "Three people gave statements. They're in the <em>statements</em> table, along with hundreds of others from every incident this term, and plenty of those mention lanyards too. Only pull out the ones for <em>our</em> incident."</p>`,
+  task:`Find only the statements for the 14 November theft (use the incident <code>id</code> from Chapter 1). <strong>What colour lanyard was the suspect wearing?</strong>`,
+  lesson:`<h4>Filtering rows with WHERE</h4>
+  <p><code>WHERE</code> keeps only the rows where a condition is true.</p>
+  <pre><code>SELECT * FROM people
+WHERE department = 'History';</code></pre>
+  <p>Put text in <b>single quotes</b>. Numbers don't need quotes:</p>
+  <pre><code>SELECT * FROM incidents WHERE id = 5;</code></pre>
+  <p>Other comparisons: <code>&lt;&gt;</code> (not equal), <code>&gt;</code>, <code>&lt;</code>, <code>&gt;=</code>, <code>&lt;=</code></p>`,
+  starter:`-- Statements for incident 3 only\nSELECT * FROM statements\n`,
+  hints:[`The column that links a statement to an incident is <code>incident_id</code>. Check your Case notebook for the id.`,
+         `Add <code>WHERE incident_id = ${CFG.caseId}</code> to the end of your query.`],
+  solution:`SELECT * FROM statements\nWHERE incident_id = ${CFG.caseId};`,
+  check:a=>norm(a)==='red'||norm(a)==='redlanyard',
+  answerText:"red",
+  clue:"Cleaner saw someone with a <b>RED lanyard</b> leave S2.14 at ~22:45. Security saw a car speed out of the staff car park at ~23:00. The plate started with <b>CY</b> and ended with <b>X</b>."
+},
+{
+  title:"Door Logs",
+  concept:"AND · BETWEEN · ORDER BY",
+  story:`<p>Room S2.14 has a keycard lock. Every swipe goes into the <em>keycard_log</em> table, and that's nearly ten thousand beeps across the building since October. S2.14 is busy late on lots of nights.</p>
+  <p>"Narrow it down," says Edwards. "Just that door, just the night of the 14th between <em>22:00 and 23:30</em>, in time order."</p>`,
+  task:`List every swipe on door <code>S2.14</code> between <code>2026-11-14 22:00</code> and <code>2026-11-14 23:30</code>, oldest first. <strong>How many swipes are there?</strong>`,
+  lesson:`<h4>Combining conditions and sorting</h4>
+  <p>Join conditions with <code>AND</code> (both must be true) or <code>OR</code> (either one).</p>
+  <p><code>BETWEEN</code> checks a range, and includes both ends:</p>
+  <pre><code>SELECT * FROM bank_transfers
+WHERE amount BETWEEN 10 AND 50
+  AND reference = 'pizza'
+ORDER BY amount DESC;</code></pre>
+  <p><code>ORDER BY</code> sorts the results: <code>ASC</code> (the default) or <code>DESC</code>.</p>
+  <p>Times here are stored as text like <code>'2026-11-14 22:15'</code>, which still compares and sorts correctly. Always include the date as well as the time.</p>
+  <p>The green status bar under the console tells you how many rows your query returned.</p>`,
+  starter:`SELECT * FROM keycard_log\nWHERE door = 'S2.14'\n`,
+  hints:[`Add a second condition with <code>AND swipe_time BETWEEN '…' AND '…'</code>.`,
+         `Use <code>BETWEEN '2026-11-14 22:00' AND '2026-11-14 23:30'</code> (include the date!), then finish with <code>ORDER BY swipe_time</code>. The status bar tells you how many rows came back.`],
+  solution:`SELECT * FROM keycard_log\nWHERE door = 'S2.14'\n  AND swipe_time BETWEEN '2026-11-14 22:00' AND '2026-11-14 23:30'\nORDER BY swipe_time;`,
+  check:a=>norm(a)===String(CFG.ch3),
+  wrong:{'16':"So close! You're missing swipes at exactly 22:00 and exactly 23:30. BETWEEN includes both ends, but > and < don't. Use BETWEEN, or >= and <=.",
+         '145':"Way too many. You've got late-night swipes from every night since October. Your times need the date too: '2026-11-14 22:00'.",
+         '37':"Too many. That's every door in the building. Did you filter on door = 'S2.14'?",
+         '26':"Too many. Something is matching more than one door. Use door = 'S2.14' exactly, not LIKE."},
+  answerText:String(CFG.ch3),
+  clue:`<b>${CFG.ch3} swipes</b> on S2.14 between 22:00 and 23:30 (including one at exactly 22:00 and one at exactly 23:30). Security entered at 23:20 and discovered the theft.`
+},
+{
+  title:"Names, Not Numbers",
+  concept:"JOIN · DISTINCT",
+  story:`<p>The log only shows a <em>person_id</em>, just a number. The names are kept in the <em>people</em> table.</p>
+  <p>"Numbers don't go to court, Detective. Names do. Link the two tables together and tell me how many different people went in or out of that room."</p>`,
+  task:`Join <code>keycard_log</code> to <code>people</code> for the same door and time window. <strong>How many different people swiped?</strong>`,
+  lesson:`<h4>Joining tables</h4>
+  <p>A <code>JOIN</code> matches rows from two tables using a shared value:</p>
+  <pre><code>SELECT people.name, vehicles.plate
+FROM vehicles
+JOIN people ON vehicles.owner_id = people.id;</code></pre>
+  <p>Aliases save typing: <code>FROM vehicles v JOIN people p ON v.owner_id = p.id</code></p>
+  <p><code>SELECT DISTINCT</code> removes duplicate rows. That's handy when someone swiped twice.</p>
+  <pre><code>SELECT DISTINCT department FROM people;</code></pre>`,
+  starter:`SELECT k.swipe_time, k.direction, p.name\nFROM keycard_log k\nJOIN people p ON ...\nWHERE k.door = 'S2.14'\n  AND k.swipe_time BETWEEN '2026-11-14 22:00' AND '2026-11-14 23:30'\nORDER BY k.swipe_time;`,
+  hints:[`Which column in <code>keycard_log</code> matches <code>people.id</code>? Replace the <code>...</code> with <code>k.person_id = p.id</code>.`,
+         `To count each person once, change the first line to <code>SELECT DISTINCT p.name</code> and remove the ORDER BY.`],
+  solution:`SELECT DISTINCT p.name\nFROM keycard_log k\nJOIN people p ON k.person_id = p.id\nWHERE k.door = 'S2.14'\n  AND k.swipe_time BETWEEN '2026-11-14 22:00' AND '2026-11-14 23:30';`,
+  check:a=>norm(a)===String(CFG.ch4),
+  wrong:{[String(CFG.ch3)]:"That's the number of swipes. Everyone swiped in AND out, and some people went in twice. Try SELECT DISTINCT.",
+         '7':"Nearly. Have you dropped someone at the very edge of the window? Your time range must include exactly 22:00 and 23:30.",
+         '10':"Too many. Check your time window. Some people swiped just before 22:00 or just after 23:30."},
+  answerText:String(CFG.ch4),
+  clue:`<b>${CFG.ch4} people</b> used S2.14 that night: ${CFG.ch4names.join(', ')}.`
+},
+{
+  title:"The Red Lanyard",
+  concept:"Joining 3 tables",
+  story:`<p>${CFG.ch4} names. Remember the cleaner's statement: the person had a <em>red lanyard</em>.</p>
+  <p>Lanyard colours depend on department. The <em>departments</em> table lists the colour for each one. Don't assume you know which departments wear red. Check. You'll need to join three tables: the log, the people, and their departments.</p>`,
+  task:`Of the people who swiped S2.14 that night, <strong>who wears a red lanyard?</strong> Enter their names, or how many there are.`,
+  lesson:`<h4>Chaining JOINs</h4>
+  <p>You can keep adding <code>JOIN</code>s, one link at a time:</p>
+  <pre><code>SELECT p.name, d.building
+FROM vehicles v
+JOIN people p      ON v.owner_id = p.id
+JOIN departments d ON p.department = d.name;</code></pre>
+  <p>Once tables are joined, <code>WHERE</code> can filter on columns from any of them.</p>`,
+  starter:`SELECT DISTINCT p.name, p.department, d.lanyard_colour\nFROM keycard_log k\nJOIN people p ON k.person_id = p.id\nJOIN departments d ON ...\nWHERE k.door = 'S2.14'\n  AND k.swipe_time BETWEEN '2026-11-14 22:00' AND '2026-11-14 23:30';`,
+  hints:[`<code>people.department</code> holds a department name, and so does <code>departments.name</code>. Join on those.`,
+         `Finish the join with <code>p.department = d.name</code>, then add <code>AND d.lanyard_colour = 'red'</code>. More than one department wears red!`],
+  solution:`SELECT DISTINCT p.name, p.department, d.lanyard_colour\nFROM keycard_log k\nJOIN people p ON k.person_id = p.id\nJOIN departments d ON p.department = d.name\nWHERE k.door = 'S2.14'\n  AND k.swipe_time BETWEEN '2026-11-14 22:00' AND '2026-11-14 23:30'\n  AND d.lanyard_colour = 'red';`,
+  check:a=>{const n=norm(a); if(['3','three'].includes(n))return true; const l=String(a).toLowerCase(); return /ffion/.test(l)&&/rhys/.test(l)&&/mared/.test(l)&&!/(dafydd|gwen|sara|marek|owen|ifan|grace)/.test(l);},
+  wrongFn:a=>{const l=String(a).toLowerCase(), n=norm(a);
+    if(/ifan|grace/.test(l)||['4','5','four','five'].includes(n)) return "Too many. Ifan Pritchard and Grace Owen wear red, but check their swipe times. They're just outside 22:00–23:30.";
+    if(n==='2'||n==='two'||(/ffion/.test(l)&&/rhys/.test(l)&&!/mared/.test(l))) return "You've missed someone. Did you filter on department = 'Physics'? Physics isn't the only department with red lanyards. Filter on lanyard_colour instead.";
+    if(/ollie|emyr/.test(l)) return "They wear red and were in the building, but did they swipe door S2.14?";
+    return "Not quite. Filter on d.lanyard_colour = 'red', and keep the same door and time window as before.";},
+  answerText:"3 (Ffion Lloyd, Mared Ellis & Rhys Bevan)",
+  clue:"Three red-lanyard suspects swiped S2.14: <b>Ffion Lloyd</b> (Physics, in 22:08, out 22:21), <b>Mared Ellis</b> (Electronic Engineering, in 22:17, out 22:33) and <b>Rhys Bevan</b> (Physics, in 22:38, out 22:46)."
+},
+{
+  title:"The Getaway Car",
+  concept:"LIKE & wildcards",
+  story:`<p>Three suspects. Now back to the security officer's statement: a car tore out of the staff car park at <em>around 23:00</em>. The plate <em>started with CY and ended with X</em>.</p>
+  <p>Use <em>vehicles</em> to match partial plates and <em>car_park_log</em> to check when each car left. There are over 200 cars and thousands of car park records, and several cars will fit. Your suspect list will settle it.</p>`,
+  task:`Find cars whose plate starts <code>CY</code> and ends <code>X</code> that exited between <code>22:50</code> and <code>23:10</code> on 14 Nov. <strong>Which of our suspects owns one?</strong>`,
+  lesson:`<h4>Pattern matching with LIKE</h4>
+  <p><code>LIKE</code> matches text against a pattern:</p>
+  <pre><code>%   any number of characters (even none)
+_   exactly one character</code></pre>
+  <pre><code>SELECT * FROM people WHERE name LIKE 'G%';     -- starts with G
+SELECT * FROM people WHERE name LIKE '%son';   -- ends with son
+SELECT * FROM people WHERE phone LIKE '07_9%'; -- 4th char is 9</code></pre>`,
+  starter:`SELECT v.plate, v.make, v.colour, c.exit_time, p.name, p.department\nFROM car_park_log c\nJOIN vehicles v ON c.plate = v.plate\nJOIN people p ON v.owner_id = p.id\nWHERE v.plate LIKE ...\n`,
+  hints:[`A pattern for "starts with CY, ends with X" is <code>'CY%X'</code>.`,
+         `Add <code>AND c.exit_time BETWEEN '2026-11-14 22:50' AND '2026-11-14 23:10'</code>. Several cars match, so check which owner is one of your three suspects.`],
+  solution:`SELECT v.plate, v.make, v.colour, c.exit_time, p.name, p.department\nFROM car_park_log c\nJOIN vehicles v ON c.plate = v.plate\nJOIN people p ON v.owner_id = p.id\nWHERE v.plate LIKE 'CY%X'\n  AND c.exit_time BETWEEN '2026-11-14 22:50' AND '2026-11-14 23:10';`,
+  check:a=>/rhys/.test(String(a).toLowerCase())&&!/ffion|tom/.test(String(a).toLowerCase()),
+  wrongFn:a=>{const l=String(a).toLowerCase();
+    if(/ffion/.test(l))return "Ffion's plate does match CY…X, but check her exit time. She left well before 22:50.";
+    if(/mared/.test(l))return "Mared's car did leave around then, but look at her plate. It ends in X but doesn't start with CY.";
+    for(const d of CFG.ch6decoys){ if(l.includes(d.toLowerCase().split(' ')[0])) return d+"'s car fits the plate and the time, but did "+d.split(' ')[0]+" swipe into S2.14 with a red lanyard? Check your suspect list."; }
+    return "Not quite. Which of the matching cars belongs to one of your three suspects?";},
+  answerText:"Rhys Bevan",
+  clue:"<b>Rhys Bevan's</b> silver Corsa (CY70 RBX) left the car park at 23:01, 15 minutes after he swiped out of S2.14. Ffion left at 22:31; Mared's car (LL66 MEX) doesn't match the plate."
+},
+{
+  title:"Follow the Money",
+  concept:"GROUP BY · SUM · HAVING",
+  story:`<p>Rhys Bevan is brought in. He's a PhD student, with no obvious reason to want every exam paper in the university. He won't talk.</p>
+  <p>"Somebody put him up to this," Edwards says. "Check the <em>bank_transfers</em>. If someone paid him, it'll show up as more than <em>£1,000 in total</em> during November."</p>`,
+  task:`Add up the money each person sent <b>Rhys Bevan</b> in <b>November 2026</b>. <strong>Who sent him more than £1,000 in total?</strong> Be precise: there are thousands of transfers, and more than one Rhys.`,
+  lesson:`<h4>Aggregates and groups</h4>
+  <p>Aggregate functions squash many rows into one value: <code>COUNT(*)</code>, <code>SUM(col)</code>, <code>AVG(col)</code>, <code>MIN(col)</code>, <code>MAX(col)</code>.</p>
+  <p><code>GROUP BY</code> makes one result row per group:</p>
+  <pre><code>SELECT department, COUNT(*) AS staff
+FROM people
+GROUP BY department
+HAVING COUNT(*) > 3;</code></pre>
+  <p><code>WHERE</code> filters rows <i>before</i> grouping. <code>HAVING</code> filters the groups <i>after</i>.</p>
+  <p><code>AS</code> gives a result column a friendlier name: <code>SUM(amount) AS total</code>.</p>
+  <p>Remember <code>LIKE</code> from the last chapter? <code>transfer_date LIKE '2026-10%'</code> matches every date in October 2026.</p>`,
+  starter:`-- Step 1: find Rhys Bevan's id\nSELECT id, name FROM people WHERE name = 'Rhys Bevan';\n\n-- Step 2: who sent him money in November 2026, and how much in total?\nSELECT p.name AS sender, SUM(t.amount) AS total\nFROM bank_transfers t\nJOIN people p ON t.sender_id = p.id\nWHERE t.recipient_id = ...\n`,
+  hints:[`Step 1: run the first query to get Rhys Bevan's <code>id</code> (careful, there's also a Rhys Evans). Step 2: in <code>bank_transfers</code>, Rhys is the <code>recipient_id</code>. Join <code>people</code> on <code>t.sender_id = p.id</code> to see who sent the money.`,
+         `<code>WHERE t.recipient_id = ${CFG.rhysId} AND t.transfer_date LIKE '2026-11%'</code> (include the year!), then <code>GROUP BY p.name HAVING SUM(t.amount) &gt; 1000</code>.`],
+  solution:`-- Step 1: Rhys Bevan's id\nSELECT id, name FROM people WHERE name = 'Rhys Bevan';\n\n-- Step 2: November 2026 totals by sender\nSELECT p.name AS sender, SUM(t.amount) AS total, COUNT(*) AS payments\nFROM bank_transfers t\nJOIN people p ON t.sender_id = p.id\nWHERE t.recipient_id = ${CFG.rhysId}\n  AND t.transfer_date LIKE '2026-11%'\nGROUP BY p.name\nHAVING SUM(t.amount) > 1000;`,
+  check:a=>/thorne/.test(String(a).toLowerCase()),
+  wrongFn:a=>{const l=String(a).toLowerCase();
+    if(/ollie/.test(l))return "Ollie Jenkins sent Rhys over £1,000 in total, but not all of it in November. Filter on transfer_date first.";
+    if(/emyr/.test(l))return "Emyr Parry sent exactly £1,000.00. The question says MORE than £1,000. Is your HAVING using > or >=?";
+    if(l.includes(CFG.yearDecoy.toLowerCase().split(' ')[0]))return CFG.yearDecoy+"'s payments were in November 2025, last year! Make sure your date filter includes the year: LIKE '2026-11%'.";
+    if(l.includes(CFG.revansDecoy.toLowerCase().split(' ')[0]))return CFG.revansDecoy+" paid Rhys EVANS, not Rhys Bevan. Use the exact name (or Rhys Bevan's id).";
+    return null;},
+  answerText:"Alun Thorne",
+  clue:"<b>Alun Thorne</b> (Visiting Fellow, Business) paid Rhys £1,500 in two \"consultancy\" payments, on 10 Nov and the day after the theft."
+},
+{
+  title:"The Inside Job",
+  concept:"Subqueries",
+  story:`<p>Thorne is the mastermind. But something still bothers you: that <em>CCTV camera</em> went offline at exactly the right time. Cameras don't just switch themselves off.</p>
+  <p>"Thorne paid Rhys," you say. "Who else did he pay?"</p>`,
+  task:`Use a subquery to list everyone who received money from Alun Thorne. Then check <code>cctv_log</code> for camera <code>DS-2F-CAM3</code> on the night of the theft. <strong>Who switched the camera off just before the theft?</strong>`,
+  lesson:`<h4>Subqueries: a query inside a query</h4>
+  <p>Use one query's result as a value…</p>
+  <pre><code>SELECT * FROM vehicles
+WHERE owner_id = (SELECT id FROM people
+                  WHERE name = 'Tom Hughes');</code></pre>
+  <p>…or as a list, with <code>IN</code>:</p>
+  <pre><code>SELECT name FROM people
+WHERE id IN (SELECT owner_id FROM vehicles
+             WHERE colour = 'Red');</code></pre>
+  <p>The inner query runs first, and its answer is used by the outer query.</p>
+  <p>The <code>cctv_log</code> table stores <code>changed_by</code> as a person's id. To see a name, JOIN it to <code>people</code> like you did in Chapter 4: <code>JOIN people p ON c.changed_by = p.id</code>.</p>`,
+  starter:`SELECT name, role, department\nFROM people\nWHERE id IN (\n  -- everyone Alun Thorne has sent money to\n  SELECT recipient_id FROM bank_transfers\n  WHERE sender_id = ...\n);`,
+  hints:[`Replace <code>...</code> with another subquery: <code>(SELECT id FROM people WHERE name = 'Alun Thorne')</code>. Or look up Thorne's id first and type in the number.`,
+         `Thorne pays lots of people, so the payments alone won't tell you. Check the camera's log for that day: <code>SELECT * FROM cctv_log WHERE camera = 'DS-2F-CAM3' AND log_time LIKE '2026-11-14%';</code> and look at who changed it around 22:30.`,
+         `<code>changed_by</code> is a person's id. Turn it into a name with a JOIN: <code>SELECT c.log_time, c.status, p.name FROM cctv_log c JOIN people p ON c.changed_by = p.id WHERE c.camera = 'DS-2F-CAM3' AND c.log_time LIKE '2026-11-14%';</code> Then match the name to Thorne's list.`],
+  solution:`SELECT name, role, department\nFROM people\nWHERE id IN (\n  SELECT recipient_id FROM bank_transfers\n  WHERE sender_id = (SELECT id FROM people WHERE name = 'Alun Thorne')\n);\n\n-- Who changed the floor 2 camera on the 14th?\nSELECT c.log_time, c.status, p.name\nFROM cctv_log c\nJOIN people p ON c.changed_by = p.id\nWHERE c.camera = 'DS-2F-CAM3'\n  AND c.log_time LIKE '2026-11-14%';`,
+  check:a=>/carys|wynne/.test(String(a).toLowerCase()),
+  wrongFn:a=>{const l=String(a).toLowerCase();
+    if(/rhys/.test(l))return "Rhys stole the drive, but someone else handled the camera. Who else is on Thorne's payroll?";
+    if(/huw/.test(l))return "Huw Rowlands is a CCTV technician and Thorne did pay him (£35 parking), and he worked on DS-2F-CAM3 that day. But check WHEN. Was it near 22:30?";
+    if(/bethan/.test(l))return "Bethan worked on a different camera. Check the camera name.";
+    return "Not quite. Cross-check the names Thorne paid against who changed DS-2F-CAM3 at about 22:29 on the 14th.";},
+  answerText:"Carys Wynne",
+  clue:"<b>Carys Wynne</b> (CCTV Technician) received £1,000 of \"equipment hire\" from Thorne, and put camera DS-2F-CAM3 into maintenance mode at 22:29. Huw's maintenance was at 10:15 that morning."
+}
+];
+
+const BONUS = [
+  {tag:"WHERE + COUNT", q:"How many people work in the Computing department?", check:a=>norm(a)===String(CFG.bonus.computing)},
+  {tag:"GROUP BY + ORDER BY", q:"Which door appears most often in the whole keycard_log?", check:a=>norm(a).replace(/\./g,'')===norm(CFG.bonus.door).replace(/\./g,'')},
+  {tag:"GROUP BY", q:"What is the most common car colour in the vehicles table?", check:a=>norm(a)===norm(CFG.bonus.colour)},
+  {tag:"AVG + ROUND", q:"What is the average bank transfer amount, rounded to 2 decimal places?", check:a=>norm(a).replace('£','')===String(CFG.bonus.avg)},
+  {tag:"GROUP BY + ORDER BY", q:"Which department has the second-most people?", check:a=>norm(a)===norm(CFG.bonus.dept2)},
+  {tag:"LEFT JOIN / NOT IN", q:"How many people do NOT own a vehicle?", check:a=>norm(a)===String(CFG.bonus.nocar)},
+];
+
+/* ---------------- State ---------------- */
+const STORE='sqldetective-deanstreet-v2';
+let state={name:'',solved:{},hintsUsed:{},solutionUsed:{},drafts:{},bonus:{},current:0,introSeen:false};
+try{const s=JSON.parse(localStorage.getItem(STORE)||'null'); if(s) state=Object.assign(state,s);}catch(e){}
+const save=()=>{try{localStorage.setItem(STORE,JSON.stringify(state));}catch(e){}};
+const unlocked=i=> i===0 || !!state.solved[i-1];
+const allSolved=()=>CHAPTERS.every((_,i)=>state.solved[i]);
+function starsFor(i){ if(!state.solved[i]) return 0; if(state.solutionUsed[i]) return 1; if((state.hintsUsed[i]||0)>0) return 2; return 3; }
+const totalStars=()=>CHAPTERS.reduce((s,_,i)=>s+starsFor(i),0);
+function rank(){const s=totalStars(), m=CHAPTERS.length*3; const r=s/m;
+  if(r>=.95) return "Master Detective"; if(r>=.8) return "Senior Inspector"; if(r>=.6) return "Detective Sergeant"; if(r>=.4) return "Detective Constable"; return "Rookie Investigator";}
+
+/* ---------------- DB ---------------- */
+let SQL, db;
+function buildDB(){ if(db) db.close(); db=new SQL.Database(); db.exec(SEED); }
+
+/* ---------------- Editor ---------------- */
+const ed=document.getElementById('editor'), hl=document.getElementById('hl'), gutter=document.getElementById('gutter');
+const KW=new Set(('select from where and or not in is null like between order by asc desc group having join inner left right outer full on as distinct limit offset union all case when then else end exists insert update delete drop create table alter into values set with cross natural using count sum avg min max round upper lower length substr coalesce ifnull cast date time strftime abs total replace trim').split(' '));
+const FN=new Set('count sum avg min max round upper lower length substr coalesce ifnull cast date time strftime abs total replace trim'.split(' '));
+const esc=s=>s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function highlight(src){
+  const re=/(--[^\n]*)|('(?:[^']|'')*'?)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_][A-Za-z0-9_]*)|([<>=!]=?|<>|\*)|([\s\S])/g;
+  let out='',m;
+  while((m=re.exec(src))){
+    if(m[1]) out+=`<span class="tok-cm">${esc(m[1])}</span>`;
+    else if(m[2]) out+=`<span class="tok-str">${esc(m[2])}</span>`;
+    else if(m[3]) out+=`<span class="tok-num">${m[3]}</span>`;
+    else if(m[4]){const w=m[4].toLowerCase(); if(FN.has(w)&&src[re.lastIndex]==='(') out+=`<span class="tok-fn">${m[4]}</span>`; else if(KW.has(w)) out+=`<span class="tok-kw">${m[4]}</span>`; else out+=m[4];}
+    else if(m[5]) out+=`<span class="tok-op">${esc(m[5])}</span>`;
+    else out+=esc(m[6]);
+  }
+  return out+'\n ';
+}
+function refreshEditor(){
+  hl.innerHTML=highlight(ed.value);
+  const n=ed.value.split('\n').length; let g=''; for(let i=1;i<=n;i++) g+=i+'\n'; gutter.textContent=g;
+  syncScroll();
+}
+function syncScroll(){ hl.scrollTop=ed.scrollTop; hl.scrollLeft=ed.scrollLeft; gutter.scrollTop=ed.scrollTop; }
+ed.addEventListener('input',()=>{refreshEditor(); state.drafts[state.current]=ed.value; save();});
+ed.addEventListener('scroll',syncScroll);
+ed.addEventListener('keydown',e=>{
+  if((e.ctrlKey||e.metaKey)&&e.key==='Enter'){e.preventDefault(); runQuery(); return;}
+  if(e.key==='Tab'){e.preventDefault(); insertAtCursor('  ');}
+});
+function insertAtCursor(t){ const s=ed.selectionStart,e2=ed.selectionEnd; ed.value=ed.value.slice(0,s)+t+ed.value.slice(e2); ed.selectionStart=ed.selectionEnd=s+t.length; ed.focus(); ed.dispatchEvent(new Event('input')); }
+function setEditor(t){ ed.value=t; refreshEditor(); state.drafts[state.current]=t; save(); }
+
+/* ---------------- Running queries ---------------- */
+const statusEl=document.getElementById('status'), resultsEl=document.getElementById('results');
+function setStatus(msg,cls){ statusEl.className='status'+(cls?' '+cls:''); statusEl.innerHTML=msg; }
+function stripComments(s){ return s.replace(/--[^\n]*/g,'').replace(/\/\*[\s\S]*?\*\//g,''); }
+function friendlyError(msg){
+  let m;
+  if((m=msg.match(/no such table: (\S+)/))) return `There's no table called <b>${esc(m[1])}</b>. Check the spelling in the Schema panel. Table names are things like <code>people</code> and <code>keycard_log</code>.`;
+  if((m=msg.match(/no such column: (\S+)/))) return `There's no column called <b>${esc(m[1])}</b> here. Check the spelling in the Schema panel. Text values need 'single quotes'. Without them, SQL thinks a word is a column name.`;
+  if(/ambiguous column name: (\S+)/.test(msg)){m=msg.match(/ambiguous column name: (\S+)/); return `<b>${esc(m[1])}</b> exists in more than one of your tables. Say which one you mean, e.g. <code>p.${esc(m[1].split('.').pop())}</code>.`;}
+  if(/incomplete input/.test(msg)) return `The query seems to stop early. Is there an unclosed <code>'quote'</code> or <code>(bracket</code>?`;
+  if((m=msg.match(/near "([^"]*)": syntax error/))) return `SQL got confused near <b>${esc(m[1])}</b>. Check for missing commas between columns, a missing keyword, or a stray character. Also check that clauses are in order: SELECT → FROM → JOIN → WHERE → GROUP BY → HAVING → ORDER BY.`;
+  if(/misuse of aggregate/.test(msg)) return `You can't use an aggregate like SUM() or COUNT() inside WHERE. Use <code>HAVING</code> after <code>GROUP BY</code> instead.`;
+  return null;
+}
+function runQuery(){
+  const src=ed.value; const clean=stripComments(src).trim();
+  if(!clean){ setStatus('Nothing to run. Type a query first.','err'); return; }
+  const stmts=clean.split(';').map(s=>s.trim()).filter(Boolean);
+  const bad=stmts.find(s=>!/^(select|with|pragma)\b/i.test(s));
+  if(bad){
+    setStatus('✋ Tampering with evidence is not allowed.','err');
+    resultsEl.innerHTML=`<div class="err-help">Detectives can only <b>read</b> the evidence, so only <code>SELECT</code> queries are allowed here. No INSERT, UPDATE, DELETE or DROP.</div>`;
+    return;
+  }
+  const t0=performance.now();
+  try{
+    const res=db.exec(src);
+    const ms=(performance.now()-t0).toFixed(1);
+    if(!res.length){ setStatus(`Query ran in ${ms} ms and returned <b>0 rows</b>.`,'ok'); resultsEl.innerHTML=`<div class="empty-results"><h3>No matching rows.</h3>Your query worked, but nothing matched. Check your WHERE conditions: spelling, capital letters inside quotes, and date formats like <code>'2026-11-14 22:00'</code>.</div>`; return; }
+    if(res.length===1){
+      const r=res[0]; resultsEl.innerHTML=tableHTML(r);
+      setStatus(`✓ <b>${r.values.length} row${r.values.length===1?'':'s'}</b> · ${r.columns.length} column${r.columns.length===1?'':'s'} · ${ms} ms`,'ok');
+    } else {
+      resultsEl.innerHTML=res.map((r,k)=>`<div class="res-label">Query ${k+1} · ${r.values.length} row${r.values.length===1?'':'s'}</div>`+tableHTML(r)).join('');
+      setStatus(`✓ ${res.length} queries ran · last one returned <b>${res[res.length-1].values.length} row${res[res.length-1].values.length===1?'':'s'}</b> · ${ms} ms`,'ok');
+    }
+  }catch(e){
+    const msg=String(e.message||e);
+    setStatus('✗ '+esc(msg),'err');
+    const f=friendlyError(msg);
+    resultsEl.innerHTML=f?`<div class="err-help"><b>Detective's tip:</b> ${f}</div>`:'';
+  }
+}
+function tableHTML(r){
+  const MAX=500; const rows=r.values.slice(0,MAX);
+  let h='<table class="res"><thead><tr>'+r.columns.map(c=>`<th>${esc(c)}</th>`).join('')+'</tr></thead><tbody>';
+  for(const row of rows){ h+='<tr>'+row.map(v=> v===null?'<td class="null">NULL</td>': typeof v==='number'?`<td class="num">${Number.isInteger(v)?v:Math.round(v*100)/100}</td>`:`<td>${esc(String(v))}</td>`).join('')+'</tr>'; }
+  h+='</tbody></table>';
+  if(r.values.length>MAX) h+=`<div class="empty-results">Showing first ${MAX} of ${r.values.length} rows. Narrow it down with WHERE.</div>`;
+  return h;
+}
+document.getElementById('runBtn').onclick=runQuery;
+document.getElementById('clearBtn').onclick=()=>{setEditor(''); ed.focus();};
+
+/* ---------------- Schema panel ---------------- */
+function renderSchema(){
+  const el=document.getElementById('schema');
+  const tables=db.exec("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")[0].values.map(r=>r[0]);
+  let h='<h3>Evidence database</h3>';
+  for(const t of tables){
+    const cols=db.exec(`PRAGMA table_info(${t})`)[0].values;
+    const n=db.exec(`SELECT COUNT(*) FROM ${t}`)[0].values[0][0];
+    h+=`<div class="tbl" data-t="${t}"><div class="tbl-head"><span>${t}</span><small>${n} rows</small></div><div class="cols">`+
+      cols.map(c=>`<div class="col" data-c="${c[1]}"><span>${c[1]}</span><span>${(c[2]||'').toLowerCase()}${c[5]?' · key':''}</span></div>`).join('')+
+      `<button class="peek" data-peek="${t}">Peek: first 10 rows</button></div></div>`;
+  }
+  h+=`<div class="cheat"><h3>Cheat sheet</h3>
+  <code>SELECT cols FROM t
+JOIN t2 ON t.a = t2.b
+WHERE cond
+GROUP BY col
+HAVING agg_cond
+ORDER BY col DESC
+LIMIT 10;</code>
+  Click a column name to type it into your query.</div>`;
+  el.innerHTML=h;
+  el.querySelectorAll('.tbl-head').forEach(x=>x.onclick=()=>x.parentElement.classList.toggle('open'));
+  el.querySelectorAll('.col').forEach(x=>x.onclick=()=>insertAtCursor(x.dataset.c));
+  el.querySelectorAll('.peek').forEach(x=>x.onclick=()=>{ setEditor(`SELECT * FROM ${x.dataset.peek} LIMIT 10;`); runQuery(); });
+}
+const mainEl=document.getElementById('main');
+document.getElementById('schemaToggle').onclick=()=>{
+  if(window.innerWidth<=1100) mainEl.classList.toggle('showschema-narrow'); else mainEl.classList.toggle('noschema');
+};
+
+/* ---------------- Case file ---------------- */
+const caseInner=document.getElementById('caseInner');
+function renderPips(){
+  const el=document.getElementById('pips'); let h='';
+  CHAPTERS.forEach((c,i)=>{ const cls=['pip']; if(state.solved[i])cls.push('done'); if(i===state.current)cls.push('current'); if(!unlocked(i))cls.push('locked');
+    h+=`<button class="${cls.join(' ')}" data-i="${i}" title="${unlocked(i)?'Chapter '+(i+1)+': '+c.title:'Locked'}">${state.solved[i]?'✓':i+1}</button>`; });
+  const bonusOpen=allSolved(); const bcls=['pip','bonus']; if(state.current==='bonus')bcls.push('current'); if(!bonusOpen)bcls.push('locked');
+  h+=`<button class="${bcls.join(' ')}" data-i="bonus" title="${bonusOpen?'Bonus challenges':'Solve the case to unlock'}">★ Bonus</button>`;
+  el.innerHTML=h;
+  el.querySelectorAll('.pip').forEach(b=>b.onclick=()=>{const i=b.dataset.i==='bonus'?'bonus':+b.dataset.i; if(i==='bonus'?allSolved():unlocked(i)) goTo(i);});
+  const bonusDone=Object.keys(state.bonus).length;
+  document.getElementById('score').innerHTML=`<b>${totalStars()}</b>/${CHAPTERS.length*3} ★${bonusDone?` · bonus ${bonusDone}/${BONUS.length}`:''}${state.name?' · Det. '+esc(state.name):''}`;
+}
+function goTo(i){
+  state.current=i; save(); renderPips(); renderCase();
+  if(i!=='bonus'){ const c=CHAPTERS[i]; setEditor(state.drafts[i]!=null?state.drafts[i]:c.starter); }
+  else setEditor(state.drafts.bonus!=null?state.drafts.bonus:'-- Bonus round: no starter code. You\'re on your own, Detective.\n\n');
+  resultsEl.innerHTML=''; setStatus('Ready. Write a query and press Run.');
+  document.getElementById('casefile').scrollTop=0;
+}
+function notebookHTML(){
+  const items=CHAPTERS.map((c,i)=>state.solved[i]?`<li>${c.clue}</li>`:'').join('');
+  return `<div class="notebook">${items?`<ol>${items}</ol>`:'<span class="empty">Nothing yet. Solve chapters to fill in your notebook.</span>'}</div>`;
+}
+function renderCase(){
+  if(state.current==='bonus') return renderBonus();
+  const i=state.current, c=CHAPTERS[i]; const solved=!!state.solved[i]; const used=state.hintsUsed[i]||0;
+  let h=`<span class="tab">CHAPTER ${i+1} OF ${CHAPTERS.length} · ${c.concept}</span>`;
+  if(solved) h+=`<div class="stamp">SOLVED</div>`;
+  h+=`<h2>${c.title}</h2><div class="story">${c.story}</div>`;
+  h+=`<div class="section-label">Your task</div><div class="task">${c.task}</div>`;
+  h+=`<div class="section-label">Detective training</div><div class="concept">${c.lesson}</div>`;
+  if(!solved){
+    h+=`<div class="section-label">Your answer</div>
+      <form class="answer-row" id="ansForm"><input id="ans" placeholder="Type your answer…" autocomplete="off"><button class="btn btn-dark" type="submit">Submit</button></form>
+      <div class="feedback" id="fb"></div>
+      <div class="section-label">Stuck?</div><div class="hints" id="hints">`;
+    for(let k=0;k<used;k++) h+=`<div class="hint"><b>Hint ${k+1}:</b> ${c.hints[k]}</div>`;
+    h+=`<div class="hint-actions">`;
+    if(used<c.hints.length) h+=`<button class="btn btn-ghost" id="hintBtn">Get hint ${used+1} of ${c.hints.length}</button>`;
+    else h+=`<button class="btn btn-ghost" id="solBtn">Show the solution query</button>`;
+    h+=`</div></div>`;
+  } else {
+    const s=starsFor(i);
+    h+=`<div class="section-label">Case update</div><div class="solved-box"><h4>Solved: ${esc(c.answerText)} <span class="stars">${'★'.repeat(s)}${'☆'.repeat(3-s)}</span></h4>${c.clue}<br>
+      ${i<CHAPTERS.length-1?`<button class="btn btn-amber" id="nextBtn">Next chapter →</button>`:`<button class="btn btn-amber" id="finaleBtn">Close the case →</button>`}
+      <button class="btn btn-ghost" id="showSol" style="color:#cfe9d6;border-color:#3d7a52">Load a model answer</button></div>`;
+  }
+  h+=`<div class="section-label">Case notebook</div>${notebookHTML()}`;
+  caseInner.innerHTML=h;
+  const f=document.getElementById('ansForm');
+  if(f) f.onsubmit=e=>{e.preventDefault(); submitAnswer(i);};
+  const hb=document.getElementById('hintBtn'); if(hb) hb.onclick=()=>{state.hintsUsed[i]=(state.hintsUsed[i]||0)+1; save(); renderCase(); renderPips();};
+  const sb=document.getElementById('solBtn'); if(sb) sb.onclick=()=>{
+    if(!sb.dataset.confirm){ sb.dataset.confirm='1'; sb.textContent='Sure? It costs a star. Click again'; return; }
+    state.solutionUsed[i]=true; save(); setEditor(c.solution); renderPips();
+    sb.parentElement.innerHTML='<div class="hint">The solution is now in the console. Run it, read the results, then answer.</div>';
+  };
+  const nb=document.getElementById('nextBtn'); if(nb) nb.onclick=()=>goTo(i+1);
+  const fin=document.getElementById('finaleBtn'); if(fin) fin.onclick=showFinale;
+  const ss=document.getElementById('showSol'); if(ss) ss.onclick=()=>setEditor(c.solution);
+}
+function submitAnswer(i){
+  const c=CHAPTERS[i], v=document.getElementById('ans').value.trim(), fb=document.getElementById('fb');
+  if(!v) return;
+  if(c.check(v)){
+    state.solved[i]=true; save(); renderPips(); renderCase();
+    if(i===CHAPTERS.length-1) setTimeout(showFinale,400);
+  } else {
+    let msg=(c.wrong&&c.wrong[norm(v)])||(c.wrongFn&&c.wrongFn(v))||"Not quite. Look closely at your query results. The evidence doesn't lie.";
+    fb.className='feedback bad show'; fb.textContent='✗ '+msg;
+  }
+}
+function renderBonus(){
+  let h=`<span class="tab">BONUS ROUND · FOR FAST FINISHERS</span><h2>Cold Cases</h2>
+  <div class="story"><p>The Dean Street case is closed, but the database still has secrets. No hints and no starter code. Just you, SQL, and a few new tools.</p></div>
+  <div class="section-label">New tools for the bonus round</div>
+  <div class="concept">
+    <h4>Sorting by a count, and LIMIT</h4>
+    <p>You can <code>ORDER BY</code> an aggregate, and <code>LIMIT</code> keeps just the first few rows:</p>
+    <pre><code>SELECT make, COUNT(*) AS cars
+FROM vehicles
+GROUP BY make
+ORDER BY COUNT(*) DESC
+LIMIT 3;</code></pre>
+    <h4 style="margin-top:12px">ROUND</h4>
+    <p><code>ROUND(value, 2)</code> rounds to 2 decimal places: <code>SELECT ROUND(AVG(amount), 2) FROM bank_transfers;</code></p>
+    <h4 style="margin-top:12px">Finding things that are missing</h4>
+    <p><code>NOT IN</code> is the opposite of <code>IN</code>:</p>
+    <pre><code>SELECT name FROM people
+WHERE id NOT IN (SELECT person_id FROM statements);</code></pre>
+    <p>Or use a <code>LEFT JOIN</code>. It keeps every row from the first table, filling in <code>NULL</code> where there's no match, and <code>IS NULL</code> picks those out:</p>
+    <pre><code>SELECT p.name
+FROM people p
+LEFT JOIN statements s ON s.person_id = p.id
+WHERE s.id IS NULL;</code></pre>
+    <p>To count rows, wrap the idea in <code>SELECT COUNT(*) …</code> or just read the row count in the status bar.</p>
+  </div>
+  <div class="section-label">Challenges</div><div class="bonus-list">`;
+  BONUS.forEach((b,k)=>{ const d=state.bonus[k];
+    h+=`<div class="bonus-item ${d?'done':''}"><div class="tag">${b.tag}</div><div class="q">${k+1}. ${b.q}</div>`+
+      (d?`<div style="color:#14421f;font-weight:600">✓ Solved: ${esc(d)}</div>`:
+      `<form class="answer-row" data-k="${k}"><input placeholder="Answer…"><button class="btn btn-dark">Check</button></form><div class="feedback" id="bfb${k}"></div>`)+`</div>`;
+  });
+  h+=`</div><div class="section-label">Case notebook</div>${notebookHTML()}`;
+  caseInner.innerHTML=h;
+  caseInner.querySelectorAll('form[data-k]').forEach(f=>f.onsubmit=e=>{e.preventDefault(); const k=+f.dataset.k; const v=f.querySelector('input').value.trim(); if(!v)return;
+    if(BONUS[k].check(v)){ state.bonus[k]=v; save(); renderBonus(); renderPips(); }
+    else { const fb=document.getElementById('bfb'+k); fb.className='feedback bad show'; fb.textContent='✗ Not quite. Try another query.'; }
+  });
+}
+
+/* ---------------- Modals ---------------- */
+const modalBack=document.getElementById('modalBack'), modal=document.getElementById('modal');
+function openModal(html){ modal.innerHTML=html; modalBack.classList.add('show'); }
+function closeModal(){ modalBack.classList.remove('show'); }
+function showIntro(){
+  openModal(`<h2>SQL Detective</h2>
+  <p>A crime has been committed at the university, and the only witness that never lies is the <b>database</b>.</p>
+  <p>You'll query real tables of door swipes, car park logs and bank transfers using SQL. Each chapter teaches a new skill and moves the case forward. Fewer hints mean more ★ stars.</p>
+  <label style="font:600 12px var(--sans);letter-spacing:1.4px;text-transform:uppercase;color:var(--muted-brown)">Your detective name</label>
+  <input id="nameIn" maxlength="30" placeholder="e.g. Detective Jones" value="${esc(state.name||'')}">
+  <div class="row"><button class="btn btn-dark" id="startBtn">Open the case file →</button></div>`);
+  const go=()=>{ state.name=document.getElementById('nameIn').value.trim().replace(/^detective\s+/i,''); state.introSeen=true; save(); closeModal(); renderPips(); ed.focus(); };
+  document.getElementById('startBtn').onclick=go;
+  document.getElementById('nameIn').onkeydown=e=>{if(e.key==='Enter')go();};
+  setTimeout(()=>document.getElementById('nameIn').focus(),50);
+}
+function showFinale(){
+  const s=totalStars(), m=CHAPTERS.length*3;
+  const d=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
+  openModal(`<h2>Case Closed</h2>
+  <p><b>Alun Thorne</b> planned to sell every exam paper in the university. He paid CCTV technician <b>Carys Wynne</b> to blind the floor-2 camera, and PhD student <b>Rhys Bevan</b> to take the drive from S2.14. Rhys wore his red Physics lanyard and drove off in his Corsa at 23:01.</p>
+  <p>320 people, almost 10,000 door swipes, 3,600 bank transfers, and precise SQL found the three who did it.</p>
+  <p>Three arrests. Not a single fingerprint. Just SQL.</p>
+  <div class="cert">
+    <div style="font:600 11px var(--sans);letter-spacing:2px;text-transform:uppercase;color:var(--muted-brown)">This certifies that</div>
+    <div class="big">Detective ${esc(state.name||'Anonymous')}</div>
+    <div style="font-family:var(--type)">cracked the Dean Street Heist using SELECT, WHERE, JOIN, LIKE, GROUP BY and subqueries</div>
+    <div class="stars" style="font-size:20px;letter-spacing:1px;margin:10px 0 2px;word-break:break-all">${'★'.repeat(s)}${'☆'.repeat(m-s)}</div>
+    <div class="rank">${rank()}</div>
+    <div style="font:12px var(--mono);color:var(--muted-brown);margin-top:8px">${s}/${m} stars · ${d}</div>
+  </div>
+  <div class="row" style="margin-top:18px"><button class="btn btn-ghost" id="closeFin">Review the case</button><button class="btn btn-amber" id="toBonus">Bonus challenges ★</button></div>`);
+  document.getElementById('closeFin').onclick=closeModal;
+  document.getElementById('toBonus').onclick=()=>{closeModal(); goTo('bonus');};
+  renderPips();
+}
+document.getElementById('resetBtn').onclick=()=>{
+  openModal(`<h2>Start over?</h2><p>This wipes your progress, stars and saved queries on this device.</p>
+  <div class="row"><button class="btn btn-ghost" id="noR">Cancel</button><button class="btn btn-dark" id="yesR" style="background:var(--red)">Reset everything</button></div>`);
+  document.getElementById('noR').onclick=closeModal;
+  document.getElementById('yesR').onclick=()=>{ state={name:'',solved:{},hintsUsed:{},solutionUsed:{},drafts:{},bonus:{},current:0,introSeen:false}; save(); closeModal(); goTo(0); showIntro(); };
+};
+
+/* ---------------- Boot ---------------- */
+Promise.all([initSqlJs(), fetch('seed.txt').then(r=>{ if(!r.ok) throw new Error('seed '+r.status); return r.text(); })]).then(([S,seedText])=>{
+  SQL=S; SEED=seedText; buildDB(); renderSchema();
+  if(state.current==='bonus'&&!allSolved()) state.current=0;
+  if(typeof state.current==='number'&&!unlocked(state.current)) state.current=0;
+  goTo(state.current);
+  document.getElementById('loading').remove();
+  if(!state.introSeen) showIntro();
+}).catch(e=>{ document.getElementById('loading').textContent='Could not load the SQL engine: '+e.message; });
+</script>
+</body>
+</html>
